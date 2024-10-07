@@ -31,6 +31,7 @@ struct PlayMode : Mode {
 	//connection to server:
 	Client &client;
 
-	void render_numbers(uint32_t w, uint32_t h, std::vector<uint32_t> data);
+	void print_grid();
+	void print_clues();
 
 };

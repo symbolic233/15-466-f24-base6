@@ -45,7 +45,7 @@ struct Player {
 
 	glm::vec3 color = glm::vec3(1.0f, 1.0f, 1.0f);
 	std::string name = "";
-	bool fill_mode = false;
+	bool fill_mode = true;
 };
 
 struct Game {
@@ -65,12 +65,21 @@ struct Game {
 	//the update rate on the server:
 	inline static constexpr float Tick = 1.0f / 10.0f;
 
-	inline static uint32_t width = 10;
-	inline static uint32_t height = 10;
+	inline static uint32_t width = 20;
+	inline static uint32_t height = 15;
+	struct Clues {
+		uint32_t width;
+		uint32_t height;
+		std::vector<std::vector<uint32_t>> by_row;
+		std::vector<std::vector<uint32_t>> by_col;
+	} clues;
 	struct Grid {
-		std::vector<uint32_t> solution;
-		std::vector<uint32_t> progress;
+		std::vector<std::vector<uint32_t>> solution;
+		std::vector<std::vector<uint32_t>> progress;
 	} grid;
+
+	void make_grid();
+	void render_numbers(uint32_t w, uint32_t h, std::vector<std::vector<uint32_t>> data);
 
 	//arena size:
 	inline static constexpr float gridSize = 0.1f;

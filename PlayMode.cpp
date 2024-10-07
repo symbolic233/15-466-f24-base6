@@ -11,7 +11,37 @@
 #include <random>
 #include <array>
 
+// print debuggers
+void PlayMode::print_grid() {
+	for (uint32_t j = 0; j < Game::height; j++) {
+		for (uint32_t i = 0; i < Game::width; i++) {
+			std::cout << game.grid.solution[j][i];
+		}
+		std::cout << std::endl;
+	}
+	std::cout << std::endl;
+}
+void PlayMode::print_clues() {
+	std::cout << "Row clues:" << std::endl;
+	for (std::vector<uint32_t> row_clue : game.clues.by_row) {
+		for (uint32_t c : row_clue) {
+			std::cout << c;
+		}
+		std::cout << std::endl;
+	}
+	std::cout << "Column clues:" << std::endl;
+	for (std::vector<uint32_t> col_clue : game.clues.by_col) {
+		for (uint32_t c : col_clue) {
+			std::cout << c;
+		}
+		std::cout << std::endl;
+	}
+	std::cout << std::endl;
+}
+
 PlayMode::PlayMode(Client &client_) : client(client_) {
+	print_grid();
+	print_clues();
 }
 
 PlayMode::~PlayMode() {
@@ -127,8 +157,8 @@ void PlayMode::draw(glm::uvec2 const &drawable_size) {
 	//figure out view transform to center the arena:
 	float aspect = float(drawable_size.x) / float(drawable_size.y);
 	float scale = std::min(
-		2.0f * aspect / (Game::ArenaMax.x - Game::ArenaMin.x + 2.0f * Game::PlayerRadius),
-		2.0f / (Game::ArenaMax.y - Game::ArenaMin.y + 2.0f * Game::PlayerRadius)
+		1.0f * aspect / (Game::ArenaMax.x - Game::ArenaMin.x + 2.0f * Game::PlayerRadius),
+		1.0f / (Game::ArenaMax.y - Game::ArenaMin.y + 2.0f * Game::PlayerRadius)
 	);
 	glm::vec2 offset = -0.5f * (Game::ArenaMax + Game::ArenaMin);
 
@@ -195,7 +225,7 @@ void PlayMode::draw(glm::uvec2 const &drawable_size) {
 					);
 				}
 				// player indicator
-				glm::vec2 base_pos{-0.9f, 0.0f};
+				glm::vec2 base_pos{Game::ArenaMin.x - 0.25f, 0.0f};
 				for (uint32_t a = 0; a < square.size(); ++a) {
 					lines.draw(
 						glm::vec3(base_pos + Game::PlayerRadius * square[a], 0.0f),

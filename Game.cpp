@@ -74,7 +74,55 @@ bool Player::Controls::recv_controls_message(Connection *connection_) {
 
 //-----------------------------------------
 
-Game::Game() : mt(0x15466666) {
+void Game::render_numbers(uint32_t w, uint32_t h, std::vector<std::vector<uint32_t>> data) {
+	clues.width = w;
+	clues.height = h;
+	clues.by_row.clear();
+	clues.by_col.clear();
+	assert(data.size() >= h);
+
+	for (std::vector<uint32_t> row : data) {
+		std::vector<uint32_t> amts;
+		uint32_t run = 0;
+		for (uint32_t cell: row) {
+			if (cell) run++;
+			else {
+				if (run) amts.push_back(run);
+				run = 0;
+			}
+		}
+		if (run) amts.push_back(run);
+		clues.by_row.push_back(amts);
+	}
+
+	for (uint32_t y = 0; y < h; y++) {
+		std::vector<uint32_t> amts;
+		uint32_t run = 0;
+		for (uint32_t x = 0; x < w; x++) {
+			if (data[y][x]) run++;
+			else {
+				if (run) amts.push_back(run);
+				run = 0;
+			}
+		}
+		if (run) amts.push_back(run);
+		clues.by_col.push_back(amts);
+	}
+}
+
+void Game::make_grid() {
+	for (uint32_t j = 0; j < height; j++) {
+		std::vector<uint32_t> next_row;
+		for (uint32_t i = 0; i < width; i++) {
+			next_row.push_back(mt() % 2);
+		}
+		grid.solution.push_back(next_row);
+	}
+	render_numbers(width, height, grid.solution);
+}
+
+Game::Game() : mt(0x15466789) {
+	make_grid();
 }
 
 Player *Game::spawn_player() {
@@ -193,6 +241,9 @@ void Game::send_state_message(Connection *connection_, Player *connection_player
 		if (&player == connection_player) continue;
 		send_player(player);
 	}
+
+	// puzzle information
+	connection.send(clues);
 	connection.send(grid.progress);
 
 	//compute the message size and patch into the message header:
@@ -245,6 +296,7 @@ bool Game::recv_state_message(Connection *connection_) {
 			player.name += c;
 		}
 	}
+	read(&clues);
 	read(&grid.progress);
 
 	if (at != size) throw std::runtime_error("Trailing data in state message.");
