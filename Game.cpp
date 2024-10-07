@@ -81,9 +81,8 @@ Player *Game::spawn_player() {
 	players.emplace_back();
 	Player &player = players.back();
 
-	//random point in the middle area of the arena:
-	player.position.x = glm::mix(ArenaMin.x + 2.0f * PlayerRadius, ArenaMax.x - 2.0f * PlayerRadius, 0.4f + 0.2f * mt() / float(mt.max()));
-	player.position.y = glm::mix(ArenaMin.y + 2.0f * PlayerRadius, ArenaMax.y - 2.0f * PlayerRadius, 0.4f + 0.2f * mt() / float(mt.max()));
+	// middle of the arena
+	player.position = glm::vec2{gridSize / 2.0f, gridSize / 2.0f};
 
 	do {
 		player.color.r = mt() / float(mt.max());
@@ -112,35 +111,10 @@ void Game::remove_player(Player *player) {
 void Game::update(float elapsed) {
 	//position/velocity update:
 	for (auto &p : players) {
-		glm::vec2 dir = glm::vec2(0.0f, 0.0f);
-		if (p.controls.left.pressed) dir.x -= 1.0f;
-		if (p.controls.right.pressed) dir.x += 1.0f;
-		if (p.controls.down.pressed) dir.y -= 1.0f;
-		if (p.controls.up.pressed) dir.y += 1.0f;
-
-		if (dir == glm::vec2(0.0f)) {
-			//no inputs: just drift to a stop
-			float amt = 1.0f - std::pow(0.5f, elapsed / (PlayerAccelHalflife * 2.0f));
-			p.velocity = glm::mix(p.velocity, glm::vec2(0.0f,0.0f), amt);
-		} else {
-			//inputs: tween velocity to target direction
-			dir = glm::normalize(dir);
-
-			float amt = 1.0f - std::pow(0.5f, elapsed / PlayerAccelHalflife);
-
-			//accelerate along velocity (if not fast enough):
-			float along = glm::dot(p.velocity, dir);
-			if (along < PlayerSpeed) {
-				along = glm::mix(along, PlayerSpeed, amt);
-			}
-
-			//damp perpendicular velocity:
-			float perp = glm::dot(p.velocity, glm::vec2(-dir.y, dir.x));
-			perp = glm::mix(perp, 0.0f, amt);
-
-			p.velocity = dir * along + glm::vec2(-dir.y, dir.x) * perp;
-		}
-		p.position += p.velocity * elapsed;
+		if (p.controls.left.pressed) p.position.x -= gridSize;
+		if (p.controls.right.pressed) p.position.x += gridSize;
+		if (p.controls.down.pressed) p.position.y -= gridSize;
+		if (p.controls.up.pressed) p.position.y += gridSize;
 
 		//reset 'downs' since controls have been handled:
 		p.controls.left.downs = 0;
@@ -150,38 +124,34 @@ void Game::update(float elapsed) {
 		p.controls.jump.downs = 0;
 	}
 
-	//collision resolution:
+	// //collision resolution:
 	for (auto &p1 : players) {
-		//player/player collisions:
-		for (auto &p2 : players) {
-			if (&p1 == &p2) break;
-			glm::vec2 p12 = p2.position - p1.position;
-			float len2 = glm::length2(p12);
-			if (len2 > (2.0f * PlayerRadius) * (2.0f * PlayerRadius)) continue;
-			if (len2 == 0.0f) continue;
-			glm::vec2 dir = p12 / std::sqrt(len2);
-			//mirror velocity to be in separating direction:
-			glm::vec2 v12 = p2.velocity - p1.velocity;
-			glm::vec2 delta_v12 = dir * glm::max(0.0f, -1.75f * glm::dot(dir, v12));
-			p2.velocity += 0.5f * delta_v12;
-			p1.velocity -= 0.5f * delta_v12;
-		}
-		//player/arena collisions:
+	// 	//player/player collisions:
+	// 	for (auto &p2 : players) {
+	// 		if (&p1 == &p2) break;
+	// 		glm::vec2 p12 = p2.position - p1.position;
+	// 		float len2 = glm::length2(p12);
+	// 		if (len2 > (2.0f * PlayerRadius) * (2.0f * PlayerRadius)) continue;
+	// 		if (len2 == 0.0f) continue;
+	// 		glm::vec2 dir = p12 / std::sqrt(len2);
+	// 		//mirror velocity to be in separating direction:
+	// 		glm::vec2 v12 = p2.velocity - p1.velocity;
+	// 		glm::vec2 delta_v12 = dir * glm::max(0.0f, -1.75f * glm::dot(dir, v12));
+	// 		p2.velocity += 0.5f * delta_v12;
+	// 		p1.velocity -= 0.5f * delta_v12;
+	// 	}
+	//player/arena collisions:
 		if (p1.position.x < ArenaMin.x + PlayerRadius) {
 			p1.position.x = ArenaMin.x + PlayerRadius;
-			p1.velocity.x = std::abs(p1.velocity.x);
 		}
 		if (p1.position.x > ArenaMax.x - PlayerRadius) {
 			p1.position.x = ArenaMax.x - PlayerRadius;
-			p1.velocity.x =-std::abs(p1.velocity.x);
 		}
 		if (p1.position.y < ArenaMin.y + PlayerRadius) {
 			p1.position.y = ArenaMin.y + PlayerRadius;
-			p1.velocity.y = std::abs(p1.velocity.y);
 		}
 		if (p1.position.y > ArenaMax.y - PlayerRadius) {
 			p1.position.y = ArenaMax.y - PlayerRadius;
-			p1.velocity.y =-std::abs(p1.velocity.y);
 		}
 	}
 
@@ -203,7 +173,7 @@ void Game::send_state_message(Connection *connection_, Player *connection_player
 	//send player info helper:
 	auto send_player = [&](Player const &player) {
 		connection.send(player.position);
-		connection.send(player.velocity);
+		connection.send(player.grid_pos);
 		connection.send(player.color);
 	
 		//NOTE: can't just 'send(name)' because player.name is not plain-old-data type.
@@ -258,7 +228,7 @@ bool Game::recv_state_message(Connection *connection_) {
 		players.emplace_back();
 		Player &player = players.back();
 		read(&player.position);
-		read(&player.velocity);
+		read(&player.grid_pos);
 		read(&player.color);
 		uint8_t name_len;
 		read(&name_len);

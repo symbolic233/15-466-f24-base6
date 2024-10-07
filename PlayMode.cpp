@@ -38,10 +38,6 @@ bool PlayMode::handle_event(SDL_Event const &evt, glm::uvec2 const &window_size)
 			controls.down.downs += 1;
 			controls.down.pressed = true;
 			return true;
-		} else if (evt.key.keysym.sym == SDLK_SPACE) {
-			controls.jump.downs += 1;
-			controls.jump.pressed = true;
-			return true;
 		}
 	} else if (evt.type == SDL_KEYUP) {
 		if (evt.key.keysym.sym == SDLK_a) {
@@ -55,9 +51,6 @@ bool PlayMode::handle_event(SDL_Event const &evt, glm::uvec2 const &window_size)
 			return true;
 		} else if (evt.key.keysym.sym == SDLK_s) {
 			controls.down.pressed = false;
-			return true;
-		} else if (evt.key.keysym.sym == SDLK_SPACE) {
-			controls.jump.pressed = false;
 			return true;
 		}
 	}
