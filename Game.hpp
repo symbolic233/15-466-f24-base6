@@ -28,7 +28,7 @@ struct Button {
 struct Player {
 	//player inputs (sent from client):
 	struct Controls {
-		Button left, right, up, down, jump;
+		Button left, right, up, down, shift;
 
 		void send_controls_message(Connection *connection) const;
 
@@ -40,11 +40,12 @@ struct Player {
 
 	//player state (sent from server):
 	glm::vec2 position = glm::vec2(0.0f, 0.0f);
-	glm::uvec2 grid_pos = glm::uvec2(10, 10);
+	glm::uvec2 grid_pos = glm::uvec2(0, 0);
 	// glm::vec2 velocity = glm::vec2(0.0f, 0.0f);
 
 	glm::vec3 color = glm::vec3(1.0f, 1.0f, 1.0f);
 	std::string name = "";
+	bool fill_mode = false;
 };
 
 struct Game {
@@ -64,10 +65,17 @@ struct Game {
 	//the update rate on the server:
 	inline static constexpr float Tick = 1.0f / 10.0f;
 
+	inline static uint32_t width = 10;
+	inline static uint32_t height = 10;
+	struct Grid {
+		std::vector<uint32_t> solution;
+		std::vector<uint32_t> progress;
+	} grid;
+
 	//arena size:
 	inline static constexpr float gridSize = 0.1f;
-	inline static glm::vec2 ArenaMin = glm::vec2(-10.0f, -10.0f) * gridSize;
-	inline static glm::vec2 ArenaMax = glm::vec2( 10.0f,  10.0f) * gridSize;
+	inline static glm::vec2 ArenaMin = glm::vec2(-(float)width / 2.0f, -(float)height / 2.0f) * gridSize;
+	inline static glm::vec2 ArenaMax = glm::vec2( (float)width / 2.0f,  (float)height / 2.0f) * gridSize;
 
 	//player constants:
 	inline static constexpr float PlayerRadius = gridSize / 2;

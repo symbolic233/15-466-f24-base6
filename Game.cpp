@@ -29,7 +29,7 @@ void Player::Controls::send_controls_message(Connection *connection_) const {
 	send_button(right);
 	send_button(up);
 	send_button(down);
-	send_button(jump);
+	send_button(shift);
 }
 
 bool Player::Controls::recv_controls_message(Connection *connection_) {
@@ -63,7 +63,7 @@ bool Player::Controls::recv_controls_message(Connection *connection_) {
 	recv_button(recv_buffer[4+1], &right);
 	recv_button(recv_buffer[4+2], &up);
 	recv_button(recv_buffer[4+3], &down);
-	recv_button(recv_buffer[4+4], &jump);
+	recv_button(recv_buffer[4+4], &shift);
 
 	//delete message from buffer:
 	recv_buffer.erase(recv_buffer.begin(), recv_buffer.begin() + 4 + size);
@@ -81,8 +81,9 @@ Player *Game::spawn_player() {
 	players.emplace_back();
 	Player &player = players.back();
 
-	// middle of the arena
-	player.position = glm::vec2{gridSize / 2.0f, gridSize / 2.0f};
+	// bottom-left of the arena
+	player.position = ArenaMin + glm::vec2{gridSize / 2.0f, gridSize / 2.0f};
+	player.grid_pos = glm::uvec2(0, 0);
 
 	do {
 		player.color.r = mt() / float(mt.max());
@@ -115,13 +116,14 @@ void Game::update(float elapsed) {
 		if (p.controls.right.pressed) p.position.x += gridSize;
 		if (p.controls.down.pressed) p.position.y -= gridSize;
 		if (p.controls.up.pressed) p.position.y += gridSize;
+		if (p.controls.shift.pressed) p.fill_mode = !p.fill_mode;
 
 		//reset 'downs' since controls have been handled:
 		p.controls.left.downs = 0;
 		p.controls.right.downs = 0;
 		p.controls.up.downs = 0;
 		p.controls.down.downs = 0;
-		p.controls.jump.downs = 0;
+		p.controls.shift.downs = 0;
 	}
 
 	// //collision resolution:
@@ -174,6 +176,7 @@ void Game::send_state_message(Connection *connection_, Player *connection_player
 	auto send_player = [&](Player const &player) {
 		connection.send(player.position);
 		connection.send(player.grid_pos);
+		connection.send(player.fill_mode);
 		connection.send(player.color);
 	
 		//NOTE: can't just 'send(name)' because player.name is not plain-old-data type.
@@ -190,6 +193,7 @@ void Game::send_state_message(Connection *connection_, Player *connection_player
 		if (&player == connection_player) continue;
 		send_player(player);
 	}
+	connection.send(grid.progress);
 
 	//compute the message size and patch into the message header:
 	uint32_t size = uint32_t(connection.send_buffer.size() - mark);
@@ -229,6 +233,7 @@ bool Game::recv_state_message(Connection *connection_) {
 		Player &player = players.back();
 		read(&player.position);
 		read(&player.grid_pos);
+		read(&player.fill_mode);
 		read(&player.color);
 		uint8_t name_len;
 		read(&name_len);
@@ -240,6 +245,7 @@ bool Game::recv_state_message(Connection *connection_) {
 			player.name += c;
 		}
 	}
+	read(&grid.progress);
 
 	if (at != size) throw std::runtime_error("Trailing data in state message.");
 
