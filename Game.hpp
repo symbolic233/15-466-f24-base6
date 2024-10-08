@@ -28,7 +28,7 @@ struct Button {
 struct Player {
 	//player inputs (sent from client):
 	struct Controls {
-		Button left, right, up, down, shift;
+		Button left, right, up, down, shift, ret;
 
 		void send_controls_message(Connection *connection) const;
 
@@ -46,6 +46,8 @@ struct Player {
 	glm::vec3 color = glm::vec3(1.0f, 1.0f, 1.0f);
 	std::string name = "";
 	bool fill_mode = true;
+
+	uint32_t id;
 };
 
 struct Game {
@@ -75,10 +77,10 @@ struct Game {
 	} clues;
 	struct Grid {
 		std::vector<std::vector<uint32_t>> solution;
-		std::vector<std::vector<uint32_t>> progress;
+		std::vector<std::vector<int>> progress;
 	} grid;
 
-	void make_grid();
+	void make_grid(uint32_t w, uint32_t h);
 	void render_numbers(uint32_t w, uint32_t h, std::vector<std::vector<uint32_t>> data);
 
 	//arena size:

@@ -36,7 +36,6 @@ void PlayMode::print_clues() {
 		}
 		std::cout << std::endl;
 	}
-	std::cout << std::endl;
 }
 
 PlayMode::PlayMode(Client &client_) : client(client_) {
@@ -72,6 +71,10 @@ bool PlayMode::handle_event(SDL_Event const &evt, glm::uvec2 const &window_size)
 			controls.shift.downs += 1;
 			controls.shift.pressed = true;
 			return true;
+		} else if (evt.key.keysym.sym == SDLK_RETURN) {
+			controls.ret.downs += 1;
+			controls.ret.pressed = true;
+			return true;
 		}
 	} else if (evt.type == SDL_KEYUP) {
 		if (evt.key.keysym.sym == SDLK_a) {
@@ -88,6 +91,9 @@ bool PlayMode::handle_event(SDL_Event const &evt, glm::uvec2 const &window_size)
 			return true;
 		} else if (evt.key.keysym.sym == SDLK_LSHIFT || evt.key.keysym.sym == SDLK_RSHIFT) {
 			controls.shift.pressed = false;
+			return true;
+		} else if (evt.key.keysym.sym == SDLK_RETURN) {
+			controls.ret.pressed = false;
 			return true;
 		}
 	}
@@ -190,6 +196,33 @@ void PlayMode::draw(glm::uvec2 const &drawable_size) {
 		lines.draw(glm::vec3(Game::ArenaMin.x, Game::ArenaMin.y, 0.0f), glm::vec3(Game::ArenaMin.x, Game::ArenaMax.y, 0.0f), glm::u8vec4(0xff, 0xff, 0xff, 0xff));
 		lines.draw(glm::vec3(Game::ArenaMax.x, Game::ArenaMin.y, 0.0f), glm::vec3(Game::ArenaMax.x, Game::ArenaMax.y, 0.0f), glm::u8vec4(0xff, 0xff, 0xff, 0xff));
 
+		// draw clues
+		glm::vec2 row_cell_pos(Game::ArenaMin.x - Game::gridSize, Game::ArenaMax.y - Game::gridSize);
+		for (std::vector<uint32_t> row_clue : game.clues.by_row) {
+			for (auto it = row_clue.rbegin(); it != row_clue.rend(); it++) {
+				draw_text(row_cell_pos, std::to_string(*it), 0.09f);
+				row_cell_pos.x -= Game::gridSize;
+			}
+			row_cell_pos.x = Game::ArenaMin.x - Game::gridSize;
+			row_cell_pos.y -= Game::gridSize;
+		}
+		glm::vec2 col_cell_pos(Game::ArenaMin.x + 0.04f, Game::ArenaMax.y + Game::gridSize / 2.0f);
+		for (std::vector<uint32_t> col_clue : game.clues.by_col) {
+			for (auto it = col_clue.rbegin(); it != col_clue.rend(); it++) {
+				draw_text(col_cell_pos, std::to_string(*it), 0.09f);
+				col_cell_pos.y += Game::gridSize;
+			}
+			col_cell_pos.x += Game::gridSize;
+			col_cell_pos.y = Game::ArenaMax.y + Game::gridSize / 2.0f;
+		}
+		// std::cout << "Column clues:" << std::endl;
+		// for (std::vector<uint32_t> col_clue : game.clues.by_col) {
+		// 	for (uint32_t c : col_clue) {
+		// 		std::cout << c;
+		// 	}
+		// 	std::cout << std::endl;
+		// }
+
 		for (auto const &player : game.players) {
 			glm::u8vec4 col = glm::u8vec4(player.color.x*255, player.color.y*255, player.color.z*255, 0xff);
 			if (!player.fill_mode) {
@@ -216,16 +249,8 @@ void PlayMode::draw(glm::uvec2 const &drawable_size) {
 				}
 			}
 			if (&player == &game.players.front()) {
-				//mark current player (which server sends first):
-				for (uint32_t a = 0; a < circle.size(); ++a) {
-					lines.draw(
-						glm::vec3(player.position + Game::PlayerRadius * 0.8f * circle[a], 0.0f),
-						glm::vec3(player.position + Game::PlayerRadius * 0.8f * circle[(a+1)%circle.size()], 0.0f),
-						col
-					);
-				}
 				// player indicator
-				glm::vec2 base_pos{Game::ArenaMin.x - 0.25f, 0.0f};
+				glm::vec2 base_pos{Game::ArenaMin.x - 0.25f - game.clues.width * 0.05f, 0.0f};
 				for (uint32_t a = 0; a < square.size(); ++a) {
 					lines.draw(
 						glm::vec3(base_pos + Game::PlayerRadius * square[a], 0.0f),

@@ -95,10 +95,10 @@ void Game::render_numbers(uint32_t w, uint32_t h, std::vector<std::vector<uint32
 		clues.by_row.push_back(amts);
 	}
 
-	for (uint32_t y = 0; y < h; y++) {
+	for (uint32_t x = 0; x < w; x++) {
 		std::vector<uint32_t> amts;
 		uint32_t run = 0;
-		for (uint32_t x = 0; x < w; x++) {
+		for (uint32_t y = 0; y < h; y++) {
 			if (data[y][x]) run++;
 			else {
 				if (run) amts.push_back(run);
@@ -110,7 +110,11 @@ void Game::render_numbers(uint32_t w, uint32_t h, std::vector<std::vector<uint32
 	}
 }
 
-void Game::make_grid() {
+void Game::make_grid(uint32_t w, uint32_t h) {
+	width = w;
+	height = h;
+	ArenaMin = glm::vec2(-(float)width / 2.0f, -(float)height / 2.0f) * gridSize;
+	ArenaMax = glm::vec2( (float)width / 2.0f,  (float)height / 2.0f) * gridSize;
 	for (uint32_t j = 0; j < height; j++) {
 		std::vector<uint32_t> next_row;
 		for (uint32_t i = 0; i < width; i++) {
@@ -122,7 +126,7 @@ void Game::make_grid() {
 }
 
 Game::Game() : mt(0x15466789) {
-	make_grid();
+	make_grid(8, 7);
 }
 
 Player *Game::spawn_player() {
@@ -140,7 +144,9 @@ Player *Game::spawn_player() {
 	} while (player.color == glm::vec3(0.0f));
 	player.color = glm::normalize(player.color);
 
-	player.name = "Player " + std::to_string(next_player_number++);
+	player.name = "Player " + std::to_string(next_player_number);
+	player.id = next_player_number;
+	next_player_number++;
 
 	return &player;
 }
@@ -160,11 +166,32 @@ void Game::remove_player(Player *player) {
 void Game::update(float elapsed) {
 	//position/velocity update:
 	for (auto &p : players) {
-		if (p.controls.left.pressed) p.position.x -= gridSize;
-		if (p.controls.right.pressed) p.position.x += gridSize;
-		if (p.controls.down.pressed) p.position.y -= gridSize;
-		if (p.controls.up.pressed) p.position.y += gridSize;
+		if (p.controls.left.pressed) {
+			if (p.grid_pos.x) {
+				p.position.x -= gridSize;
+				p.grid_pos.x -= 1;
+			}
+		}
+		if (p.controls.right.pressed) {
+			if (p.grid_pos.x != width) {
+				p.position.x += gridSize;
+				p.grid_pos.x += 1;
+			}
+		}
+		if (p.controls.down.pressed) {
+			if (p.grid_pos.y) {
+				p.position.y -= gridSize;
+				p.grid_pos.y -= 1;
+			}
+		}
+		if (p.controls.up.pressed) {
+			if (p.grid_pos.y != height) {
+				p.position.y += gridSize;
+				p.grid_pos.y += 1;
+			}
+		}
 		if (p.controls.shift.pressed) p.fill_mode = !p.fill_mode;
+		if (p.controls.ret.pressed) p.fill_mode = p.fill_mode;
 
 		//reset 'downs' since controls have been handled:
 		p.controls.left.downs = 0;
@@ -172,6 +199,7 @@ void Game::update(float elapsed) {
 		p.controls.up.downs = 0;
 		p.controls.down.downs = 0;
 		p.controls.shift.downs = 0;
+		p.controls.ret.downs = 0;
 	}
 
 	// //collision resolution:
@@ -225,6 +253,7 @@ void Game::send_state_message(Connection *connection_, Player *connection_player
 		connection.send(player.position);
 		connection.send(player.grid_pos);
 		connection.send(player.fill_mode);
+		connection.send(player.id);
 		connection.send(player.color);
 	
 		//NOTE: can't just 'send(name)' because player.name is not plain-old-data type.
@@ -242,9 +271,31 @@ void Game::send_state_message(Connection *connection_, Player *connection_player
 		send_player(player);
 	}
 
+	auto send_vec_vec = [&](std::vector<std::vector<int>> data) {
+		connection.send(data.size());
+		for (std::vector<int> v : data) {
+			connection.send(v.size());
+			for (int i : v) {
+				connection.send(i);
+			}
+		}
+	};
+	auto send_vec_uvec = [&](std::vector<std::vector<uint32_t>> data) {
+		connection.send(data.size());
+		for (std::vector<uint32_t> v : data) {
+			connection.send(v.size());
+			for (uint32_t i : v) {
+				connection.send(i);
+			}
+		}
+	};
+
 	// puzzle information
-	connection.send(clues);
-	connection.send(grid.progress);
+	connection.send(clues.height);
+	connection.send(clues.width);
+	send_vec_uvec(clues.by_row);
+	send_vec_uvec(clues.by_col);
+	send_vec_vec(grid.progress);
 
 	//compute the message size and patch into the message header:
 	uint32_t size = uint32_t(connection.send_buffer.size() - mark);
@@ -285,6 +336,7 @@ bool Game::recv_state_message(Connection *connection_) {
 		read(&player.position);
 		read(&player.grid_pos);
 		read(&player.fill_mode);
+		read(&player.id);
 		read(&player.color);
 		uint8_t name_len;
 		read(&name_len);
@@ -296,8 +348,39 @@ bool Game::recv_state_message(Connection *connection_) {
 			player.name += c;
 		}
 	}
-	read(&clues);
-	read(&grid.progress);
+	read(&clues.height);
+	read(&clues.width);
+	auto read_vec_vec = [&](std::vector<std::vector<int>> &target) {
+		size_t outer_size;
+		read(&outer_size);
+		for (size_t i = 0; i < outer_size; i++) {
+			target.emplace_back();
+			std::vector<int> next = target.back();
+			size_t inner_size;
+			read(&inner_size);
+			for (size_t j = 0; j < inner_size; j++) {
+				next.emplace_back();
+				read(&next.back());
+			}
+		}
+	};
+	auto read_vec_uvec = [&](std::vector<std::vector<uint32_t>> &target) {
+		size_t outer_size;
+		read(&outer_size);
+		for (size_t i = 0; i < outer_size; i++) {
+			target.emplace_back();
+			std::vector<uint32_t> next = target.back();
+			size_t inner_size;
+			read(&inner_size);
+			for (size_t j = 0; j < inner_size; j++) {
+				next.emplace_back();
+				read(&next.back());
+			}
+		}
+	};
+	read_vec_uvec(clues.by_row);
+	read_vec_uvec(clues.by_col);
+	read_vec_vec(grid.progress);
 
 	if (at != size) throw std::runtime_error("Trailing data in state message.");
 
