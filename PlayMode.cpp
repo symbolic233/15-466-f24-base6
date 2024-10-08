@@ -260,6 +260,7 @@ void PlayMode::draw(glm::uvec2 const &drawable_size) {
 		}
 
 		float pscale = 0.5f;
+		glm::vec2 lb_position{Game::ArenaMin.x - 0.5f - game.clues.width * Game::cellSize / 2.0f, Game::ArenaMax.y};
 		for (auto const &player : game.players) {
 			glm::u8vec4 cur_color = glm::u8vec4(player.color * 255.0f, 0xff);
 			if (!player.fill_mode) {
@@ -270,12 +271,13 @@ void PlayMode::draw(glm::uvec2 const &drawable_size) {
 			}
 			draw_shape(player.position, 1.0f, square, cur_color);
 
+			draw_shape(lb_position, 0.75f, square, cur_color);
+			std::string text = "- " + std::to_string(player.fill_correct);
 			if (&player == &game.players.front()) {
-				// player indicator
-				glm::vec2 indicator{Game::ArenaMin.x - 0.25f - game.clues.width * 0.05f, 0.0f};
-				draw_shape(indicator, 1.0f, square, cur_color);
-				draw_text(indicator + glm::vec2{0.08f, 0.0f} + glm::vec2(0.0f, -0.1f + Game::PlayerRadius), "You", 0.09f);
+				text += " (You)";
 			}
+			draw_text(lb_position + glm::vec2{0.08f, 0.0f} + glm::vec2(0.0f, -0.1f + Game::PlayerRadius), text, 0.09f);
+			lb_position.y -= Game::cellSize;
 		}
 		// draw our icon on top of others
 		auto const &player = game.players.front();

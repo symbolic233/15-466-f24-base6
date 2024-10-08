@@ -1,8 +1,8 @@
-# (TODO: your game's title)
+# Open Nonogram
 
-Author: (TODO: your name)
+Author: Yoseph Mak
 
-Design: (TODO: In two sentences or fewer, describe what is new and interesting about your game.)
+Design: This is a nonogram puzzle game where multiple people work together to complete the grid.
 
 Networking: (TODO: How does your game implement client/server multiplayer? What messages are transmitted? Where in the code?)
 

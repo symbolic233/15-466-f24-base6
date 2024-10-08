@@ -49,6 +49,8 @@ struct Player {
 	bool fill_mode = true;
 
 	uint32_t id;
+
+	uint32_t fill_correct, fill_incorrect, x_correct, x_incorrect = 0;
 };
 
 struct Game {

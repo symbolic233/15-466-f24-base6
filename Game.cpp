@@ -215,8 +215,22 @@ void Game::update(float elapsed) {
 		if (p.controls.shift.pressed) p.fill_mode = !p.fill_mode;
 		if (p.controls.ret.pressed) {
 			std::cout << p.grid_pos.x << ", " << p.grid_pos.y << std::endl;
-			if (grid.progress[p.grid_pos.y][p.grid_pos.x] == 0)
-				grid.progress[p.grid_pos.y][p.grid_pos.x] = p.id * (p.fill_mode ? 1 : -1);
+			if (grid.progress[p.grid_pos.y][p.grid_pos.x] != 0) continue; // already completed
+			if (p.fill_mode && grid.solution[p.grid_pos.y][p.grid_pos.x]) {
+				p.fill_correct++;
+				grid.progress[p.grid_pos.y][p.grid_pos.x] = p.id;
+			}
+			else if (p.fill_mode && !grid.solution[p.grid_pos.y][p.grid_pos.x]) {
+				p.fill_incorrect++;
+			}
+			else if (!p.fill_mode && grid.solution[p.grid_pos.y][p.grid_pos.x]) {
+				p.x_incorrect++;
+			}
+			else if (!p.fill_mode && !grid.solution[p.grid_pos.y][p.grid_pos.x]) {
+				p.x_correct++;
+				grid.progress[p.grid_pos.y][p.grid_pos.x] = -p.id;
+			}
+			else {} // shouldn't happen
 		}
 
 		//reset 'downs' since controls have been handled:
@@ -281,6 +295,11 @@ void Game::send_state_message(Connection *connection_, Player *connection_player
 		connection.send(player.fill_mode);
 		connection.send(player.id);
 		connection.send(player.color);
+
+		connection.send(player.fill_correct);
+		connection.send(player.fill_incorrect);
+		connection.send(player.x_correct);
+		connection.send(player.x_incorrect);
 	
 		//NOTE: can't just 'send(name)' because player.name is not plain-old-data type.
 		//effectively: truncates player name to 255 chars
@@ -371,6 +390,12 @@ bool Game::recv_state_message(Connection *connection_) {
 		read(&player.fill_mode);
 		read(&player.id);
 		read(&player.color);
+
+		read(&player.fill_correct);
+		read(&player.fill_incorrect);
+		read(&player.x_correct);
+		read(&player.x_incorrect);
+
 		uint8_t name_len;
 		read(&name_len);
 		//n.b. would probably be more efficient to directly copy from recv_buffer, but I think this is clearer:
