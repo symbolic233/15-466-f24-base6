@@ -39,8 +39,8 @@ void PlayMode::print_clues() {
 }
 
 PlayMode::PlayMode(Client &client_) : client(client_) {
-	print_grid();
-	print_clues();
+	// print_grid();
+	// print_clues();
 }
 
 PlayMode::~PlayMode() {
@@ -112,6 +112,7 @@ void PlayMode::update(float elapsed) {
 	controls.up.downs = 0;
 	controls.down.downs = 0;
 	controls.shift.downs = 0;
+	controls.ret.downs = 0;
 
 	//send/receive data:
 	client.poll([this](Connection *c, Connection::Event event){
@@ -153,6 +154,17 @@ void PlayMode::draw(glm::uvec2 const &drawable_size) {
 		ret[1] = glm::vec2(-1.0f, 1.0f);
 		ret[2] = glm::vec2(-1.0f, -1.0f);
 		ret[3] = glm::vec2(1.0f, -1.0f);
+		return ret;
+	}();
+	static std::array< glm::vec2, 7 > const cross = [](){
+		std::array< glm::vec2, 7 > ret;
+		ret[0] = glm::vec2(0.0f, 0.0f);
+		ret[1] = glm::vec2(1.0f, 1.0f);
+		ret[2] = glm::vec2(-1.0f, -1.0f);
+		ret[3] = glm::vec2(0.0f, 0.0f);
+		ret[4] = glm::vec2(1.0f, -1.0f);
+		ret[5] = glm::vec2(-1.0f, 1.0f);
+		ret[6] = glm::vec2(0.0f, 0.0f);
 		return ret;
 	}();
 
@@ -197,76 +209,73 @@ void PlayMode::draw(glm::uvec2 const &drawable_size) {
 		lines.draw(glm::vec3(Game::ArenaMax.x, Game::ArenaMin.y, 0.0f), glm::vec3(Game::ArenaMax.x, Game::ArenaMax.y, 0.0f), glm::u8vec4(0xff, 0xff, 0xff, 0xff));
 
 		// draw clues
-		glm::vec2 row_cell_pos(Game::ArenaMin.x - Game::gridSize, Game::ArenaMax.y - Game::gridSize);
+		glm::vec2 row_cell_pos(Game::ArenaMin.x - Game::cellSize, Game::ArenaMax.y - Game::cellSize);
 		for (std::vector<uint32_t> row_clue : game.clues.by_row) {
 			for (auto it = row_clue.rbegin(); it != row_clue.rend(); it++) {
 				draw_text(row_cell_pos, std::to_string(*it), 0.09f);
-				row_cell_pos.x -= Game::gridSize;
+				row_cell_pos.x -= Game::cellSize;
 			}
-			row_cell_pos.x = Game::ArenaMin.x - Game::gridSize;
-			row_cell_pos.y -= Game::gridSize;
+			row_cell_pos.x = Game::ArenaMin.x - Game::cellSize;
+			row_cell_pos.y -= Game::cellSize;
 		}
-		glm::vec2 col_cell_pos(Game::ArenaMin.x + 0.04f, Game::ArenaMax.y + Game::gridSize / 2.0f);
+		glm::vec2 col_cell_pos(Game::ArenaMin.x + 0.04f, Game::ArenaMax.y + Game::cellSize / 2.0f);
 		for (std::vector<uint32_t> col_clue : game.clues.by_col) {
 			for (auto it = col_clue.rbegin(); it != col_clue.rend(); it++) {
 				draw_text(col_cell_pos, std::to_string(*it), 0.09f);
-				col_cell_pos.y += Game::gridSize;
+				col_cell_pos.y += Game::cellSize;
 			}
-			col_cell_pos.x += Game::gridSize;
-			col_cell_pos.y = Game::ArenaMax.y + Game::gridSize / 2.0f;
+			col_cell_pos.x += Game::cellSize;
+			col_cell_pos.y = Game::ArenaMax.y + Game::cellSize / 2.0f;
 		}
-		// std::cout << "Column clues:" << std::endl;
-		// for (std::vector<uint32_t> col_clue : game.clues.by_col) {
-		// 	for (uint32_t c : col_clue) {
-		// 		std::cout << c;
-		// 	}
-		// 	std::cout << std::endl;
-		// }
+
+		auto draw_shape = [&](glm::vec2 pos, float scale, auto &shape, glm::u8vec4 color) {
+			for (uint32_t a = 0; a < shape.size(); ++a) {
+				lines.draw(
+					glm::vec3(pos + Game::PlayerRadius * scale * shape[a], 0.0f),
+					glm::vec3(pos + Game::PlayerRadius * scale * shape[(a+1)%shape.size()], 0.0f),
+					color
+				);
+			}
+		};
+
+		// draw in grid
+		float gscale = 0.75f;
+		// std::cout << "trying to draw grid" << std::endl;
+		for (uint32_t y = 0; y < Game::height; y++) {
+			for (uint32_t x = 0; x < Game::width; x++) {
+				if (game.grid.progress[y][x] == 0) continue;
+				int key = game.grid.progress[y][x];
+				auto colorcheck = game.colormap.find(std::abs(key));
+				glm::vec3 base_color = (colorcheck != game.colormap.end()) ? colorcheck->second : glm::vec3{1.0f};
+				glm::u8vec4 this_color{game.colormap[std::abs(key)] * 255.0f, 0xff};
+				glm::vec2 cellPos{Game::ArenaMin.x + Game::cellSize / 2.0f, Game::ArenaMax.y - Game::cellSize / 2.0f};
+				cellPos += glm::vec2{(float)x, -((float)y)} * Game::cellSize;
+				if (game.grid.progress[y][x] < 0) {
+					draw_shape(cellPos, gscale, cross, this_color);
+				}
+				else {
+					draw_shape(cellPos, gscale, square, this_color);
+				}
+			}
+		}
 
 		for (auto const &player : game.players) {
-			glm::u8vec4 col = glm::u8vec4(player.color.x*255, player.color.y*255, player.color.z*255, 0xff);
+			glm::u8vec4 cur_color = glm::u8vec4(player.color * 255.0f, 0xff);
+			float pscale = 0.5f;
 			if (!player.fill_mode) {
-				// X mode
-				lines.draw(
-					glm::vec3(player.position + Game::PlayerRadius * glm::vec2(-0.5f,-0.5f), 0.0f),
-					glm::vec3(player.position + Game::PlayerRadius * glm::vec2( 0.5f, 0.5f), 0.0f),
-					col
-				);
-				lines.draw(
-					glm::vec3(player.position + Game::PlayerRadius * glm::vec2(-0.5f, 0.5f), 0.0f),
-					glm::vec3(player.position + Game::PlayerRadius * glm::vec2( 0.5f,-0.5f), 0.0f),
-					col
-				);
+				draw_shape(player.position, pscale, cross, cur_color);
 			}
 			else {
-				// fill mode
-				for (uint32_t a = 0; a < square.size(); ++a) {
-					lines.draw(
-						glm::vec3(player.position + Game::PlayerRadius * 0.5f * square[a], 0.0f),
-						glm::vec3(player.position + Game::PlayerRadius * 0.5f * square[(a+1)%square.size()], 0.0f),
-						col
-					);
-				}
+				draw_shape(player.position, pscale, square, cur_color);
 			}
+
 			if (&player == &game.players.front()) {
 				// player indicator
-				glm::vec2 base_pos{Game::ArenaMin.x - 0.25f - game.clues.width * 0.05f, 0.0f};
-				for (uint32_t a = 0; a < square.size(); ++a) {
-					lines.draw(
-						glm::vec3(base_pos + Game::PlayerRadius * square[a], 0.0f),
-						glm::vec3(base_pos + Game::PlayerRadius * square[(a+1)%square.size()], 0.0f),
-						col
-					);
-				}
-				draw_text(base_pos + glm::vec2{0.08f, 0.0f} + glm::vec2(0.0f, -0.1f + Game::PlayerRadius), "You", 0.09f);
+				glm::vec2 indicator{Game::ArenaMin.x - 0.25f - game.clues.width * 0.05f, 0.0f};
+				draw_shape(indicator, 1.0f, square, cur_color);
+				draw_text(indicator + glm::vec2{0.08f, 0.0f} + glm::vec2(0.0f, -0.1f + Game::PlayerRadius), "You", 0.09f);
 			}
-			for (uint32_t a = 0; a < square.size(); ++a) {
-				lines.draw(
-					glm::vec3(player.position + Game::PlayerRadius * square[a], 0.0f),
-					glm::vec3(player.position + Game::PlayerRadius * square[(a+1)%square.size()], 0.0f),
-					col
-				);
-			}
+			draw_shape(player.position, 1.0f, square, cur_color);
 		}
 	}
 	GL_ERRORS();

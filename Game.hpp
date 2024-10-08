@@ -5,6 +5,7 @@
 #include <string>
 #include <list>
 #include <random>
+#include <unordered_map>
 
 struct Connection;
 
@@ -82,14 +83,16 @@ struct Game {
 
 	void make_grid(uint32_t w, uint32_t h);
 	void render_numbers(uint32_t w, uint32_t h, std::vector<std::vector<uint32_t>> data);
+	bool completed_grid();
+	std::unordered_map<uint32_t, glm::vec3> colormap;
 
 	//arena size:
-	inline static constexpr float gridSize = 0.1f;
-	inline static glm::vec2 ArenaMin = glm::vec2(-(float)width / 2.0f, -(float)height / 2.0f) * gridSize;
-	inline static glm::vec2 ArenaMax = glm::vec2( (float)width / 2.0f,  (float)height / 2.0f) * gridSize;
+	inline static constexpr float cellSize = 0.1f;
+	inline static glm::vec2 ArenaMin = glm::vec2(-(float)width / 2.0f, -(float)height / 2.0f) * cellSize;
+	inline static glm::vec2 ArenaMax = glm::vec2( (float)width / 2.0f,  (float)height / 2.0f) * cellSize;
 
 	//player constants:
-	inline static constexpr float PlayerRadius = gridSize / 2;
+	inline static constexpr float PlayerRadius = cellSize / 2;
 	inline static constexpr float PlayerSpeed = 2.0f;
 	inline static constexpr float PlayerAccelHalflife = 0.25f;
 	

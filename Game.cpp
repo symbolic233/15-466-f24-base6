@@ -12,7 +12,7 @@ void Player::Controls::send_controls_message(Connection *connection_) const {
 	assert(connection_);
 	auto &connection = *connection_;
 
-	uint32_t size = 5;
+	uint32_t size = 6;
 	connection.send(Message::C2S_Controls);
 	connection.send(uint8_t(size));
 	connection.send(uint8_t(size >> 8));
@@ -30,6 +30,7 @@ void Player::Controls::send_controls_message(Connection *connection_) const {
 	send_button(up);
 	send_button(down);
 	send_button(shift);
+	send_button(ret);
 }
 
 bool Player::Controls::recv_controls_message(Connection *connection_) {
@@ -44,7 +45,7 @@ bool Player::Controls::recv_controls_message(Connection *connection_) {
 	uint32_t size = (uint32_t(recv_buffer[3]) << 16)
 	              | (uint32_t(recv_buffer[2]) << 8)
 	              |  uint32_t(recv_buffer[1]);
-	if (size != 5) throw std::runtime_error("Controls message with size " + std::to_string(size) + " != 5!");
+	if (size != 6) throw std::runtime_error("Controls message with size " + std::to_string(size) + " != 6!");
 	
 	//expecting complete message:
 	if (recv_buffer.size() < 4 + size) return false;
@@ -64,6 +65,7 @@ bool Player::Controls::recv_controls_message(Connection *connection_) {
 	recv_button(recv_buffer[4+2], &up);
 	recv_button(recv_buffer[4+3], &down);
 	recv_button(recv_buffer[4+4], &shift);
+	recv_button(recv_buffer[4+5], &ret);
 
 	//delete message from buffer:
 	recv_buffer.erase(recv_buffer.begin(), recv_buffer.begin() + 4 + size);
@@ -113,15 +115,24 @@ void Game::render_numbers(uint32_t w, uint32_t h, std::vector<std::vector<uint32
 void Game::make_grid(uint32_t w, uint32_t h) {
 	width = w;
 	height = h;
-	ArenaMin = glm::vec2(-(float)width / 2.0f, -(float)height / 2.0f) * gridSize;
-	ArenaMax = glm::vec2( (float)width / 2.0f,  (float)height / 2.0f) * gridSize;
+	ArenaMin = glm::vec2(-(float)width / 2.0f, -(float)height / 2.0f) * cellSize;
+	ArenaMax = glm::vec2( (float)width / 2.0f,  (float)height / 2.0f) * cellSize;
+	grid.progress.clear();
+	grid.solution.clear();
 	for (uint32_t j = 0; j < height; j++) {
 		std::vector<uint32_t> next_row;
+		std::vector<int> blank_row;
 		for (uint32_t i = 0; i < width; i++) {
 			next_row.push_back(mt() % 2);
+			blank_row.push_back(0);
 		}
+		assert(next_row.size() == width);
+		assert(blank_row.size() == width);
 		grid.solution.push_back(next_row);
+		grid.progress.push_back(blank_row);
 	}
+	assert(grid.solution.size() == height);
+	assert(grid.progress.size() == height);
 	render_numbers(width, height, grid.solution);
 }
 
@@ -134,7 +145,7 @@ Player *Game::spawn_player() {
 	Player &player = players.back();
 
 	// bottom-left of the arena
-	player.position = ArenaMin + glm::vec2{gridSize / 2.0f, gridSize / 2.0f};
+	player.position = glm::vec2{ArenaMin.x + cellSize / 2.0f, ArenaMax.y - cellSize / 2.0f};
 	player.grid_pos = glm::uvec2(0, 0);
 
 	do {
@@ -147,6 +158,8 @@ Player *Game::spawn_player() {
 	player.name = "Player " + std::to_string(next_player_number);
 	player.id = next_player_number;
 	next_player_number++;
+
+	colormap[player.id] = player.color;
 
 	return &player;
 }
@@ -163,35 +176,48 @@ void Game::remove_player(Player *player) {
 	assert(found);
 }
 
+bool Game::completed_grid() {
+	for (uint32_t y = 0; y < height; y++) {
+		for (uint32_t x = 0; x < width; x++) {
+			if ((grid.solution[y][x] == 0) ^ (grid.progress[y][x] == 0)) return false;
+		}
+	}
+	return true;
+}
+
 void Game::update(float elapsed) {
 	//position/velocity update:
 	for (auto &p : players) {
 		if (p.controls.left.pressed) {
 			if (p.grid_pos.x) {
-				p.position.x -= gridSize;
+				p.position.x -= cellSize;
 				p.grid_pos.x -= 1;
 			}
 		}
 		if (p.controls.right.pressed) {
 			if (p.grid_pos.x != width) {
-				p.position.x += gridSize;
+				p.position.x += cellSize;
 				p.grid_pos.x += 1;
 			}
 		}
-		if (p.controls.down.pressed) {
+		if (p.controls.up.pressed) {
 			if (p.grid_pos.y) {
-				p.position.y -= gridSize;
+				p.position.y += cellSize;
 				p.grid_pos.y -= 1;
 			}
 		}
-		if (p.controls.up.pressed) {
+		if (p.controls.down.pressed) {
 			if (p.grid_pos.y != height) {
-				p.position.y += gridSize;
+				p.position.y -= cellSize;
 				p.grid_pos.y += 1;
 			}
 		}
 		if (p.controls.shift.pressed) p.fill_mode = !p.fill_mode;
-		if (p.controls.ret.pressed) p.fill_mode = p.fill_mode;
+		if (p.controls.ret.pressed) {
+			std::cout << p.grid_pos.x << ", " << p.grid_pos.y << std::endl;
+			if (grid.progress[p.grid_pos.y][p.grid_pos.x] == 0)
+				grid.progress[p.grid_pos.y][p.grid_pos.x] = p.id * (p.fill_mode ? 1 : -1);
+		}
 
 		//reset 'downs' since controls have been handled:
 		p.controls.left.downs = 0;
@@ -232,7 +258,7 @@ void Game::update(float elapsed) {
 			p1.position.y = ArenaMax.y - PlayerRadius;
 		}
 	}
-
+	if (completed_grid()) std::cout << "finished" << std::endl;
 }
 
 
@@ -270,6 +296,13 @@ void Game::send_state_message(Connection *connection_, Player *connection_player
 		if (&player == connection_player) continue;
 		send_player(player);
 	}
+
+	// colormap:
+	connection.send(colormap.size());
+	for (std::pair<uint32_t, glm::vec3> p : colormap) {
+		connection.send(p.first);
+		connection.send(p.second);
+	};
 
 	auto send_vec_vec = [&](std::vector<std::vector<int>> data) {
 		connection.send(data.size());
@@ -348,36 +381,51 @@ bool Game::recv_state_message(Connection *connection_) {
 			player.name += c;
 		}
 	}
-	read(&clues.height);
-	read(&clues.width);
+
+	// colormap:
+	colormap.clear();
+	size_t colormap_size;
+	read(&colormap_size);
+	for (uint32_t i = 0; i < colormap_size; i++) {
+		uint32_t id;
+		glm::vec3 color;
+		read(&id);
+		read(&color);
+		colormap[id] = color;
+	};
+
 	auto read_vec_vec = [&](std::vector<std::vector<int>> &target) {
+		target.clear();
 		size_t outer_size;
 		read(&outer_size);
 		for (size_t i = 0; i < outer_size; i++) {
-			target.emplace_back();
-			std::vector<int> next = target.back();
+			std::vector<int> next;
 			size_t inner_size;
 			read(&inner_size);
 			for (size_t j = 0; j < inner_size; j++) {
 				next.emplace_back();
 				read(&next.back());
 			}
+			target.push_back(next);
 		}
 	};
 	auto read_vec_uvec = [&](std::vector<std::vector<uint32_t>> &target) {
+		target.clear();
 		size_t outer_size;
 		read(&outer_size);
 		for (size_t i = 0; i < outer_size; i++) {
-			target.emplace_back();
-			std::vector<uint32_t> next = target.back();
+			std::vector<uint32_t> next;
 			size_t inner_size;
 			read(&inner_size);
 			for (size_t j = 0; j < inner_size; j++) {
 				next.emplace_back();
 				read(&next.back());
 			}
+			target.push_back(next);
 		}
 	};
+	read(&clues.height);
+	read(&clues.width);
 	read_vec_uvec(clues.by_row);
 	read_vec_uvec(clues.by_col);
 	read_vec_vec(grid.progress);
