@@ -179,7 +179,7 @@ void Game::remove_player(Player *player) {
 bool Game::completed_grid() {
 	for (uint32_t y = 0; y < height; y++) {
 		for (uint32_t x = 0; x < width; x++) {
-			if ((grid.solution[y][x] == 0) ^ (grid.progress[y][x] == 0)) return false;
+			if ((grid.solution[y][x] == 0) ^ (grid.progress[y][x] <= 0)) return false;
 		}
 	}
 	return true;
@@ -189,25 +189,25 @@ void Game::update(float elapsed) {
 	//position/velocity update:
 	for (auto &p : players) {
 		if (p.controls.left.pressed) {
-			if (p.grid_pos.x) {
+			if (p.grid_pos.x > 0) {
 				p.position.x -= cellSize;
 				p.grid_pos.x -= 1;
 			}
 		}
 		if (p.controls.right.pressed) {
-			if (p.grid_pos.x != width) {
+			if (p.grid_pos.x < width - 1) {
 				p.position.x += cellSize;
 				p.grid_pos.x += 1;
 			}
 		}
 		if (p.controls.up.pressed) {
-			if (p.grid_pos.y) {
+			if (p.grid_pos.y > 0) {
 				p.position.y += cellSize;
 				p.grid_pos.y -= 1;
 			}
 		}
 		if (p.controls.down.pressed) {
-			if (p.grid_pos.y != height) {
+			if (p.grid_pos.y < height - 1) {
 				p.position.y -= cellSize;
 				p.grid_pos.y += 1;
 			}

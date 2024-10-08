@@ -259,15 +259,16 @@ void PlayMode::draw(glm::uvec2 const &drawable_size) {
 			}
 		}
 
+		float pscale = 0.5f;
 		for (auto const &player : game.players) {
 			glm::u8vec4 cur_color = glm::u8vec4(player.color * 255.0f, 0xff);
-			float pscale = 0.5f;
 			if (!player.fill_mode) {
 				draw_shape(player.position, pscale, cross, cur_color);
 			}
 			else {
 				draw_shape(player.position, pscale, square, cur_color);
 			}
+			draw_shape(player.position, 1.0f, square, cur_color);
 
 			if (&player == &game.players.front()) {
 				// player indicator
@@ -275,8 +276,17 @@ void PlayMode::draw(glm::uvec2 const &drawable_size) {
 				draw_shape(indicator, 1.0f, square, cur_color);
 				draw_text(indicator + glm::vec2{0.08f, 0.0f} + glm::vec2(0.0f, -0.1f + Game::PlayerRadius), "You", 0.09f);
 			}
-			draw_shape(player.position, 1.0f, square, cur_color);
 		}
+		// draw our icon on top of others
+		auto const &player = game.players.front();
+		glm::u8vec4 cur_color = glm::u8vec4(player.color * 255.0f, 0xff);
+		if (!player.fill_mode) {
+			draw_shape(player.position, pscale, cross, cur_color);
+		}
+		else {
+			draw_shape(player.position, pscale, square, cur_color);
+		}
+		draw_shape(player.position, 1.0f, square, cur_color);
 	}
 	GL_ERRORS();
 }
