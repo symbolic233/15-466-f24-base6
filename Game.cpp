@@ -2,9 +2,14 @@
 
 #include "Connection.hpp"
 
+#include "data_path.hpp"
+
 #include <stdexcept>
 #include <iostream>
 #include <cstring>
+
+#include <fstream>
+#include <sstream>
 
 #include <glm/gtx/norm.hpp>
 
@@ -115,18 +120,21 @@ void Game::render_numbers(uint32_t w, uint32_t h, std::vector<std::vector<uint32
 	}
 }
 
-void Game::make_grid(uint32_t w, uint32_t h) {
-	width = w;
-	height = h;
-	ArenaMin = glm::vec2(-(float)width / 2.0f, -(float)height / 2.0f) * cellSize;
-	ArenaMax = glm::vec2( (float)width / 2.0f,  (float)height / 2.0f) * cellSize;
+void Game::clear_grid() {
 	grid.progress.clear();
 	grid.solution.clear();
+}
+
+void Game::make_grid_random() {
+	uint32_t w = dim(mt_grid);
+	uint32_t h = dim(mt_grid);
+	width = w;
+	height = h;
 	for (uint32_t j = 0; j < height; j++) {
 		std::vector<uint32_t> next_row;
 		std::vector<int> blank_row;
 		for (uint32_t i = 0; i < width; i++) {
-			next_row.push_back(mt() % 2);
+			next_row.push_back(mt_grid() % 2);
 			blank_row.push_back(0);
 		}
 		assert(next_row.size() == width);
@@ -134,6 +142,42 @@ void Game::make_grid(uint32_t w, uint32_t h) {
 		grid.solution.push_back(next_row);
 		grid.progress.push_back(blank_row);
 	}
+	assert(grid.solution.size() == height);
+	assert(grid.progress.size() == height);
+	render_numbers(width, height, grid.solution);
+}
+
+void Game::make_grid_file() {
+	std::uniform_int_distribution<> custom_picker(0, (int)customs.size() - 1);
+	std::string name = customs[custom_picker(mt_grid)];
+
+	uint32_t lnum = 0;
+    std::ifstream infile(data_path("custom/" + name + ".txt"));
+	std::string line;
+
+	uint32_t w, h;
+	while (std::getline(infile, line)) {
+		if (lnum == 0) {
+			// width and height
+			std::istringstream iss(line);
+			iss >> h >> w;
+			height = h;
+			width = w;
+		}
+		else {
+			std::vector<uint32_t> next_row;
+			std::vector<int> blank_row;
+			for (uint32_t i = 0; i < width; i++) {
+				next_row.push_back((line[i] == 'o' ? 1 : 0));
+				blank_row.push_back(0);
+			}
+			assert(next_row.size() == width);
+			assert(blank_row.size() == width);
+			grid.solution.push_back(next_row);
+			grid.progress.push_back(blank_row);
+		}
+		lnum++;
+    }
 	assert(grid.solution.size() == height);
 	assert(grid.progress.size() == height);
 	render_numbers(width, height, grid.solution);
@@ -148,8 +192,24 @@ void Game::reset_positions() {
 	}
 }
 
+void Game::reset_routine() {
+	clear_grid();
+	std::uniform_int_distribution<int> biased_coin(0, 2);
+	if (biased_coin(mt_grid) > 1) make_grid_file();
+	else make_grid_random();
+	
+	ArenaMin = glm::vec2(-(float)width / 2.0f, -(float)height / 2.0f) * cellSize;
+	ArenaMax = glm::vec2( (float)width / 2.0f,  (float)height / 2.0f) * cellSize;
+	reset_positions();
+	paused = false;
+}
+
 Game::Game() : mt(0x15466789) {
-	make_grid(5, 5);
+	std::random_device rd;
+	mt_grid = std::mt19937(rd());
+	dim = std::uniform_int_distribution<>(5, 7);
+	
+	reset_routine();
 }
 
 Player *Game::spawn_player() {
@@ -197,9 +257,8 @@ bool Game::completed_grid() {
 	return true;
 }
 void Game::offscreen_players() {
-	// reset player positions
 	for (auto &player : players) {
-		// top-left of the arena
+		// throw them in the top-right somewhere where they won't come back until unpaused
 		player.position = ArenaMax * 10.0f;
 		player.grid_pos = glm::uvec2(0, 0);
 	}
@@ -213,7 +272,6 @@ void Game::clear_xs() {
 	}
 }
 
-
 void Game::update(float elapsed) {
 	// cooldown timers
 	if (paused) {
@@ -221,9 +279,7 @@ void Game::update(float elapsed) {
 		global_cooldown -= elapsed;
 		if (global_cooldown <= 0.0f) {
 			// NOW we resume
-			make_grid(6, 6);
-			reset_positions();
-			paused = false;
+			reset_routine();
 		} else return;
 	}
 

@@ -175,8 +175,8 @@ void PlayMode::draw(glm::uvec2 const &drawable_size) {
 	//figure out view transform to center the arena:
 	float aspect = float(drawable_size.x) / float(drawable_size.y);
 	float scale = std::min(
-		0.75f * aspect / (Game::ArenaMax.x - Game::ArenaMin.x + 2.0f * Game::PlayerRadius),
-		0.75f / (Game::ArenaMax.y - Game::ArenaMin.y + 2.0f * Game::PlayerRadius)
+		0.5f * aspect / (Game::ArenaMax.x - Game::ArenaMin.x + 2.0f * Game::PlayerRadius),
+		1.0f / (Game::ArenaMax.y - Game::ArenaMin.y + 2.0f * Game::PlayerRadius)
 	);
 	glm::vec2 offset = -0.5f * (Game::ArenaMax + Game::ArenaMin);
 

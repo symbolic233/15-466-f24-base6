@@ -62,7 +62,9 @@ struct Game {
 	Player *spawn_player(); //add player the end of the players list (may also, e.g., play some spawn anim)
 	void remove_player(Player *); //remove player from game (may also, e.g., play some despawn anim)
 
-	std::mt19937 mt; //used for spawning players
+	std::mt19937 mt; // used for spawning players
+	std::mt19937 mt_grid; // grid spawner
+	std::uniform_int_distribution<> dim;
 	uint32_t next_player_number = 1; //used for naming players
 
 	Game();
@@ -87,7 +89,13 @@ struct Game {
 		std::vector<std::vector<int>> progress;
 	} grid;
 
-	void make_grid(uint32_t w, uint32_t h);
+	inline static std::vector<std::string> customs{"flower", "snowglobe"};
+
+	void clear_grid();
+	void make_grid_random();
+	void make_grid_file();
+	void reset_routine();
+
 	void reset_positions();
 	void render_numbers(uint32_t w, uint32_t h, std::vector<std::vector<uint32_t>> data);
 	bool completed_grid();
@@ -107,7 +115,7 @@ struct Game {
 	inline static constexpr float PlayerSpeed = 2.0f;
 	inline static constexpr float PlayerAccelHalflife = 0.25f;
 
-	inline static constexpr float wrong_cooldown = 2.0f;
+	inline static constexpr float wrong_cooldown = 4.0f;
 	inline static constexpr float finished_cooldown = 3.0f;
 
 	inline static float global_cooldown = 0.0f;
