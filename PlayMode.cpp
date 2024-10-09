@@ -140,14 +140,14 @@ void PlayMode::update(float elapsed) {
 
 void PlayMode::draw(glm::uvec2 const &drawable_size) {
 
-	static std::array< glm::vec2, 16 > const circle = [](){
-		std::array< glm::vec2, 16 > ret;
-		for (uint32_t a = 0; a < ret.size(); ++a) {
-			float ang = a / float(ret.size()) * 2.0f * float(M_PI);
-			ret[a] = glm::vec2(std::cos(ang), std::sin(ang));
-		}
-		return ret;
-	}();
+	// static std::array< glm::vec2, 16 > const circle = [](){
+	// 	std::array< glm::vec2, 16 > ret;
+	// 	for (uint32_t a = 0; a < ret.size(); ++a) {
+	// 		float ang = a / float(ret.size()) * 2.0f * float(M_PI);
+	// 		ret[a] = glm::vec2(std::cos(ang), std::sin(ang));
+	// 	}
+	// 	return ret;
+	// }();
 	static std::array< glm::vec2, 4 > const square = [](){
 		std::array< glm::vec2, 4 > ret;
 		ret[0] = glm::vec2(1.0f, 1.0f);
@@ -247,7 +247,7 @@ void PlayMode::draw(glm::uvec2 const &drawable_size) {
 				int key = game.grid.progress[y][x];
 				auto colorcheck = game.colormap.find(std::abs(key));
 				glm::vec3 base_color = (colorcheck != game.colormap.end()) ? colorcheck->second : glm::vec3{1.0f};
-				glm::u8vec4 this_color{game.colormap[std::abs(key)] * 255.0f, 0xff};
+				glm::u8vec4 this_color{base_color * 255.0f, 0xff};
 				glm::vec2 cellPos{Game::ArenaMin.x + Game::cellSize / 2.0f, Game::ArenaMax.y - Game::cellSize / 2.0f};
 				cellPos += glm::vec2{(float)x, -((float)y)} * Game::cellSize;
 				if (game.grid.progress[y][x] < 0) {
