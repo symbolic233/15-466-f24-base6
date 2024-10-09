@@ -20,6 +20,8 @@ You get 2 points for each correct square and 1 point for each correct X. Incorre
 
 When the grid has been successfully filled out collectively, a new grid is spawned in and the process repeats. Try to maximize your points!
 
+If you need help figuring out what squares to fill, check the nonogram link earlier. Basically, the numbers indicate the runs of consecutive filled cells in order.
+
 Sources: All assets were created by me, excluding the base code which was from the [course website](http://graphics.cs.cmu.edu/courses/15-466-f24/) and minor code citations which can be found in the relevant files.
 
 This game was built with [NEST](NEST.md).
