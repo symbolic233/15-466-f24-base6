@@ -51,6 +51,10 @@ struct Player {
 	uint32_t id;
 
 	uint32_t fill_correct, fill_incorrect, x_correct, x_incorrect = 0;
+
+	float player_cooldown = 0.0f;
+
+	int score() const;
 };
 
 struct Game {
@@ -84,8 +88,13 @@ struct Game {
 	} grid;
 
 	void make_grid(uint32_t w, uint32_t h);
+	void reset_positions();
 	void render_numbers(uint32_t w, uint32_t h, std::vector<std::vector<uint32_t>> data);
 	bool completed_grid();
+	
+	void clear_xs();
+	void offscreen_players();
+
 	std::unordered_map<uint32_t, glm::vec3> colormap;
 
 	//arena size:
@@ -97,6 +106,12 @@ struct Game {
 	inline static constexpr float PlayerRadius = cellSize / 2;
 	inline static constexpr float PlayerSpeed = 2.0f;
 	inline static constexpr float PlayerAccelHalflife = 0.25f;
+
+	inline static constexpr float wrong_cooldown = 2.0f;
+	inline static constexpr float finished_cooldown = 3.0f;
+
+	inline static float global_cooldown = 0.0f;
+	inline static bool paused = false;
 	
 
 	//---- communication helpers ----

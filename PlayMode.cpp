@@ -13,8 +13,8 @@
 
 // print debuggers
 void PlayMode::print_grid() {
-	for (uint32_t j = 0; j < Game::height; j++) {
-		for (uint32_t i = 0; i < Game::width; i++) {
+	for (uint32_t j = 0; j < game.clues.height; j++) {
+		for (uint32_t i = 0; i < game.clues.width; i++) {
 			std::cout << game.grid.solution[j][i];
 		}
 		std::cout << std::endl;
@@ -175,8 +175,8 @@ void PlayMode::draw(glm::uvec2 const &drawable_size) {
 	//figure out view transform to center the arena:
 	float aspect = float(drawable_size.x) / float(drawable_size.y);
 	float scale = std::min(
-		1.0f * aspect / (Game::ArenaMax.x - Game::ArenaMin.x + 2.0f * Game::PlayerRadius),
-		1.0f / (Game::ArenaMax.y - Game::ArenaMin.y + 2.0f * Game::PlayerRadius)
+		0.75f * aspect / (Game::ArenaMax.x - Game::ArenaMin.x + 2.0f * Game::PlayerRadius),
+		0.75f / (Game::ArenaMax.y - Game::ArenaMin.y + 2.0f * Game::PlayerRadius)
 	);
 	glm::vec2 offset = -0.5f * (Game::ArenaMax + Game::ArenaMin);
 
@@ -260,7 +260,7 @@ void PlayMode::draw(glm::uvec2 const &drawable_size) {
 		}
 
 		float pscale = 0.5f;
-		glm::vec2 lb_position{Game::ArenaMin.x - 0.5f - game.clues.width * Game::cellSize / 2.0f, Game::ArenaMax.y};
+		glm::vec2 lb_position{Game::ArenaMin.x - (5.0f + Game::width / 2.0f) * Game::cellSize, Game::ArenaMax.y};
 		for (auto const &player : game.players) {
 			glm::u8vec4 cur_color = glm::u8vec4(player.color * 255.0f, 0xff);
 			if (!player.fill_mode) {
@@ -272,7 +272,7 @@ void PlayMode::draw(glm::uvec2 const &drawable_size) {
 			draw_shape(player.position, 1.0f, square, cur_color);
 
 			draw_shape(lb_position, 0.75f, square, cur_color);
-			std::string text = "- " + std::to_string(player.fill_correct);
+			std::string text = "- " + std::to_string(player.score());
 			if (&player == &game.players.front()) {
 				text += " (You)";
 			}
@@ -289,6 +289,29 @@ void PlayMode::draw(glm::uvec2 const &drawable_size) {
 			draw_shape(player.position, pscale, square, cur_color);
 		}
 		draw_shape(player.position, 1.0f, square, cur_color);
+
+		// info text
+		glm::vec2 info_position{Game::ArenaMax.x + Game::cellSize, Game::ArenaMax.y};
+		draw_text(info_position, "WASD to move", 0.09f);
+		info_position.y -= Game::cellSize;
+		draw_text(info_position, "Shift to switch mode", 0.09f);
+		info_position.y -= Game::cellSize;
+		draw_text(info_position, "Enter to guess", 0.09f);
+		
+		// Rounding from https://stackoverflow.com/questions/29200635/convert-float-to-string-with-precision-number-of-decimal-digits-specified
+		info_position.y -= Game::cellSize;
+		if (player.player_cooldown > 0.0f) {
+			std::string pcoolstr = std::to_string(player.player_cooldown);
+			pcoolstr = pcoolstr.substr(0, pcoolstr.find(".") + 2);
+			draw_text(info_position, "Wrong - try again in " + pcoolstr + " s", 0.09f);
+		}
+
+		info_position.y -= 2.0f * Game::cellSize;
+		if (Game::global_cooldown > 0.0f) {
+			std::string gcoolstr = std::to_string(Game::global_cooldown);
+			gcoolstr = gcoolstr.substr(0, gcoolstr.find(".") + 2);
+			draw_text(info_position, "Finished! New game in " + gcoolstr + " s", 0.09f);
+		}
 	}
 	GL_ERRORS();
 }

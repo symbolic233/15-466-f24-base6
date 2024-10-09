@@ -73,6 +73,9 @@ bool Player::Controls::recv_controls_message(Connection *connection_) {
 	return true;
 }
 
+int Player::score() const {
+	return 2 * fill_correct + x_correct;
+}
 
 //-----------------------------------------
 
@@ -93,7 +96,7 @@ void Game::render_numbers(uint32_t w, uint32_t h, std::vector<std::vector<uint32
 				run = 0;
 			}
 		}
-		if (run) amts.push_back(run);
+		if (run || !amts.size()) amts.push_back(run);
 		clues.by_row.push_back(amts);
 	}
 
@@ -107,7 +110,7 @@ void Game::render_numbers(uint32_t w, uint32_t h, std::vector<std::vector<uint32
 				run = 0;
 			}
 		}
-		if (run) amts.push_back(run);
+		if (run || !amts.size()) amts.push_back(run);
 		clues.by_col.push_back(amts);
 	}
 }
@@ -136,15 +139,24 @@ void Game::make_grid(uint32_t w, uint32_t h) {
 	render_numbers(width, height, grid.solution);
 }
 
+void Game::reset_positions() {
+	// reset player positions
+	for (auto &player : players) {
+		// top-left of the arena
+		player.position = glm::vec2{ArenaMin.x + cellSize / 2.0f, ArenaMax.y - cellSize / 2.0f};
+		player.grid_pos = glm::uvec2(0, 0);
+	}
+}
+
 Game::Game() : mt(0x15466789) {
-	make_grid(8, 7);
+	make_grid(5, 5);
 }
 
 Player *Game::spawn_player() {
 	players.emplace_back();
 	Player &player = players.back();
 
-	// bottom-left of the arena
+	// top-left of the arena
 	player.position = glm::vec2{ArenaMin.x + cellSize / 2.0f, ArenaMax.y - cellSize / 2.0f};
 	player.grid_pos = glm::uvec2(0, 0);
 
@@ -184,10 +196,41 @@ bool Game::completed_grid() {
 	}
 	return true;
 }
+void Game::offscreen_players() {
+	// reset player positions
+	for (auto &player : players) {
+		// top-left of the arena
+		player.position = ArenaMax * 10.0f;
+		player.grid_pos = glm::uvec2(0, 0);
+	}
+}
+
+void Game::clear_xs() {
+	for (uint32_t y = 0; y < height; y++) {
+		for (uint32_t x = 0; x < width; x++) {
+			grid.progress[y][x] = std::max(grid.progress[y][x], 0);
+		}
+	}
+}
+
 
 void Game::update(float elapsed) {
-	//position/velocity update:
+	// cooldown timers
+	if (paused) {
+		// do nothing
+		global_cooldown -= elapsed;
+		if (global_cooldown <= 0.0f) {
+			// NOW we resume
+			make_grid(4, 4);
+			reset_positions();
+			paused = false;
+		} else return;
+	}
+
+	// position responding
 	for (auto &p : players) {
+		if (p.player_cooldown > 0.0f) p.player_cooldown -= elapsed;
+
 		if (p.controls.left.pressed) {
 			if (p.grid_pos.x > 0) {
 				p.position.x -= cellSize;
@@ -214,7 +257,9 @@ void Game::update(float elapsed) {
 		}
 		if (p.controls.shift.pressed) p.fill_mode = !p.fill_mode;
 		if (p.controls.ret.pressed) {
-			std::cout << p.grid_pos.x << ", " << p.grid_pos.y << std::endl;
+			if (p.player_cooldown > 0.0f) continue; // player is stuck
+
+			// std::cout << p.grid_pos.x << ", " << p.grid_pos.y << std::endl;
 			if (grid.progress[p.grid_pos.y][p.grid_pos.x] != 0) continue; // already completed
 			if (p.fill_mode && grid.solution[p.grid_pos.y][p.grid_pos.x]) {
 				p.fill_correct++;
@@ -222,9 +267,11 @@ void Game::update(float elapsed) {
 			}
 			else if (p.fill_mode && !grid.solution[p.grid_pos.y][p.grid_pos.x]) {
 				p.fill_incorrect++;
+				p.player_cooldown = wrong_cooldown;
 			}
 			else if (!p.fill_mode && grid.solution[p.grid_pos.y][p.grid_pos.x]) {
 				p.x_incorrect++;
+				p.player_cooldown = wrong_cooldown;
 			}
 			else if (!p.fill_mode && !grid.solution[p.grid_pos.y][p.grid_pos.x]) {
 				p.x_correct++;
@@ -272,7 +319,13 @@ void Game::update(float elapsed) {
 			p1.position.y = ArenaMax.y - PlayerRadius;
 		}
 	}
-	if (completed_grid()) std::cout << "finished" << std::endl;
+	if (completed_grid()) {
+		// prepare new game
+		paused = true;
+		global_cooldown = finished_cooldown;
+		clear_xs();
+		offscreen_players();
+	}
 }
 
 
@@ -300,6 +353,8 @@ void Game::send_state_message(Connection *connection_, Player *connection_player
 		connection.send(player.fill_incorrect);
 		connection.send(player.x_correct);
 		connection.send(player.x_incorrect);
+
+		connection.send(player.player_cooldown);
 	
 		//NOTE: can't just 'send(name)' because player.name is not plain-old-data type.
 		//effectively: truncates player name to 255 chars
@@ -343,11 +398,18 @@ void Game::send_state_message(Connection *connection_, Player *connection_player
 	};
 
 	// puzzle information
+	connection.send(width);
+	connection.send(height);
+	connection.send(ArenaMin);
+	connection.send(ArenaMax);
+
 	connection.send(clues.height);
 	connection.send(clues.width);
 	send_vec_uvec(clues.by_row);
 	send_vec_uvec(clues.by_col);
 	send_vec_vec(grid.progress);
+
+	connection.send(global_cooldown);
 
 	//compute the message size and patch into the message header:
 	uint32_t size = uint32_t(connection.send_buffer.size() - mark);
@@ -396,6 +458,8 @@ bool Game::recv_state_message(Connection *connection_) {
 		read(&player.x_correct);
 		read(&player.x_incorrect);
 
+		read(&player.player_cooldown);
+
 		uint8_t name_len;
 		read(&name_len);
 		//n.b. would probably be more efficient to directly copy from recv_buffer, but I think this is clearer:
@@ -418,6 +482,11 @@ bool Game::recv_state_message(Connection *connection_) {
 		read(&color);
 		colormap[id] = color;
 	};
+
+	read(&width);
+	read(&height);
+	read(&ArenaMin);
+	read(&ArenaMax);
 
 	auto read_vec_vec = [&](std::vector<std::vector<int>> &target) {
 		target.clear();
@@ -454,6 +523,8 @@ bool Game::recv_state_message(Connection *connection_) {
 	read_vec_uvec(clues.by_row);
 	read_vec_uvec(clues.by_col);
 	read_vec_vec(grid.progress);
+
+	read(&global_cooldown);
 
 	if (at != size) throw std::runtime_error("Trailing data in state message.");
 
