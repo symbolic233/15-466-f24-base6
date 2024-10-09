@@ -1,0 +1,6 @@
+5 9
+oooo.oooo
+o....o..o
+o.oo.oooo
+o..o.o...
+oooo.o...

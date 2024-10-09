@@ -89,7 +89,7 @@ struct Game {
 		std::vector<std::vector<int>> progress;
 	} grid;
 
-	inline static std::vector<std::string> customs{"flower", "snowglobe"};
+	inline static std::vector<std::string> customs{"flower", "snowglobe", "gp", "car"};
 
 	void clear_grid();
 	void make_grid_random();

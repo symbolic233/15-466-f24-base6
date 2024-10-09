@@ -194,10 +194,10 @@ void Game::reset_positions() {
 
 void Game::reset_routine() {
 	clear_grid();
-	std::uniform_int_distribution<int> biased_coin(0, 2);
-	if (biased_coin(mt_grid) > 1) make_grid_file();
+	std::uniform_int_distribution<int> biased_coin(0, 4);
+	if (biased_coin(mt_grid) < 2) make_grid_file();
 	else make_grid_random();
-	
+
 	ArenaMin = glm::vec2(-(float)width / 2.0f, -(float)height / 2.0f) * cellSize;
 	ArenaMax = glm::vec2( (float)width / 2.0f,  (float)height / 2.0f) * cellSize;
 	reset_positions();
