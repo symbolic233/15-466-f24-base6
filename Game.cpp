@@ -221,7 +221,7 @@ void Game::update(float elapsed) {
 		global_cooldown -= elapsed;
 		if (global_cooldown <= 0.0f) {
 			// NOW we resume
-			make_grid(4, 4);
+			make_grid(6, 6);
 			reset_positions();
 			paused = false;
 		} else return;

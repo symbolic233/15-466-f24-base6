@@ -2,9 +2,9 @@
 
 Author: Yoseph Mak
 
-Design: This is a nonogram puzzle game where multiple people work together to complete the grid.
+Design: This is a [nonogram](https://en.wikipedia.org/wiki/Nonogram) puzzle game where multiple people work together to complete the grid.
 
-Networking: (TODO: How does your game implement client/server multiplayer? What messages are transmitted? Where in the code?)
+Networking: The client/server multiplayer is mainly done in the [Game.cpp](Game.cpp) file. The client and server exchange messages where the client sends over their buttons only, which tells the server what to do with them. Meanwhile, the server sends clients the state of the game, other grid information, and what all other players are doing. The actual [client.cpp](client.cpp) and [server.cpp](server.cpp) use the message code from this to communicate.
 
 Screen Shot:
 
@@ -12,9 +12,15 @@ Screen Shot:
 
 How To Play:
 
-(TODO: describe the controls and (if needed) goals/strategy.)
+Use the WASD keys to move your player cursor around. Press Enter to submit a guess.
 
-Sources: (TODO: list a source URL for any assets you did not create yourself. Make sure you have a license for the asset.)
+There are two modes - you can enter squares to be filled in, or Xs for squares to *not* be filled in. Press (either) Shift to switch between the two.
+
+You get 2 points for each correct square and 1 point for each correct X. Incorrect guesses penalize you with a short timeout to discourage brute-forcing.
+
+When the grid has been successfully filled out collectively, a new grid is spawned in and the process repeats. Try to maximize your points!
+
+Sources: All assets were created by me, excluding the base code which was from the [course website](http://graphics.cs.cmu.edu/courses/15-466-f24/) and minor code citations which can be found in the relevant files.
 
 This game was built with [NEST](NEST.md).
 
